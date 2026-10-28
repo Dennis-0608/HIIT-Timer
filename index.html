@@ -1,516 +1,389 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Timer Plus Clone</title>
+    <title>Timer Plus</title>
+    <!-- Web App iOS PWA 設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Timer Plus">
+    <link rel="apple-touch-icon" href="https://api.iconify.design/heroicons:clock-solid.svg?color=%23dc2626&height=180">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
-        :root {
-            --bg-idle: #1c1c1e;
-            --bg-prepare: #ff9500;
-            --bg-work: #ff3b30;
-            --bg-rest: #007aff;
-            --bg-completed: #34c759;
-        }
-
+        /* 隱藏 Safari 下拉刷新與溢出滾動，營造原生 App 體感 */
         body {
-            background-color: var(--bg-idle);
-            color: #ffffff;
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: background-color 0.4s ease;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #111827;
+            transition: background-color 0.4s ease-in-out;
         }
 
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
-            justify-content: space-between;
+        /* 各狀態的動態背景顏色 */
+        body.state-idle { background-color: #111827; }
+        body.state-prepare { background-color: #d97706; }
+        body.state-work { background-color: #dc2626; }
+        body.state-rest { background-color: #2563eb; }
+        body.state-finished { background-color: #16a34a; }
+
+        /* 脈動動畫 (最後 3 秒提示) */
+        @keyframes pulse-fast {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
         }
-
-        /* 頂部標題 */
-        .header {
-            text-align: center;
-            padding: 10px 0;
-        }
-
-        .state-title {
-            font-size: clamp(24px, 5vw, 36px);
-            font-weight: 800;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        .round-indicator {
-            font-size: clamp(14px, 3vw, 18px);
-            color: rgba(255, 255, 255, 0.7);
-            margin-top: 4px;
-        }
-
-        /* 中間超大數字 */
-        .timer-display-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        .timer-text {
-            font-size: clamp(80px, 25vw, 220px);
-            font-weight: 900;
-            line-height: 1;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* 底部控制與設定面板 */
-        .control-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            padding-bottom: 10px;
-        }
-
-        .settings-box {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 12px 16px;
-            backdrop-filter: blur(10px);
-            max-height: 42vh;
-            overflow-y: auto;
-        }
-
-        .setting-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .setting-row:last-child {
-            border-bottom: none;
-        }
-
-        .setting-label {
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .time-inputs {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .input-group {
-            display: flex;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 4px 8px;
-        }
-
-        .input-group span {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.6);
-            margin-left: 4px;
-        }
-
-        .setting-input {
-            width: 35px;
-            background: transparent;
-            border: none;
-            color: #fff;
-            font-size: 16px;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        .setting-input:focus {
-            outline: none;
-        }
-
-        /* 按鈕區 */
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .btn {
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transition: transform 0.1s ease;
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        .btn-main {
-            width: 80px;
-            height: 80px;
-            background-color: #ffffff;
-            color: #000000;
-        }
-
-        .btn-secondary {
-            width: 60px;
-            height: 60px;
-            background-color: rgba(255, 255, 255, 0.2);
-            color: #ffffff;
-        }
-
-        .btn-icon {
-            font-size: 28px;
-        }
-
-        /* 📱 手機橫放 (Landscape) 自動適應佈局 */
-        @media (orientation: landscape) {
-            .app-container {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                grid-template-rows: auto 1fr;
-                gap: 15px;
-                padding: 15px 30px;
-            }
-
-            .header {
-                grid-column: 1 / -1;
-                padding: 0;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .state-title {
-                font-size: 26px;
-            }
-
-            .timer-display-container {
-                grid-column: 1;
-                grid-row: 2;
-            }
-
-            .timer-text {
-                font-size: clamp(60px, 20vh, 150px);
-            }
-
-            .control-panel {
-                grid-column: 2;
-                grid-row: 2;
-                justify-content: center;
-                padding-bottom: 0;
-            }
-
-            .settings-box {
-                max-height: 220px;
-            }
+        .animate-pulse-fast {
+            animation: pulse-fast 0.5s ease-in-out infinite;
         }
     </style>
 </head>
-<body>
+<body class="state-idle text-white min-h-screen flex flex-col justify-between p-6 pb-12 select-none overflow-hidden">
 
-<div class="app-container" id="appContainer">
-    <!-- 頂部狀態與組數 -->
-    <div class="header">
-        <div class="state-title" id="stateTitle">準備就緒</div>
-        <div class="round-indicator" id="roundIndicator" style="display: none;">ROUND 1 / 3</div>
-    </div>
+    <!-- 頂部資訊欄 -->
+    <header class="pt-6 text-center">
+        <div id="statusLabel" class="text-3xl font-black tracking-widest uppercase transition-all duration-300 drop-shadow-md">
+            TIMER PLUS
+        </div>
+        <div id="roundLabel" class="text-lg font-medium text-white/80 mt-1 opacity-0 transition-opacity duration-300">
+            ROUND 1 / 5
+        </div>
+    </header>
 
-    <!-- 中間超大計時數字 -->
-    <div class="timer-display-container">
-        <div class="timer-text" id="timerText">--</div>
-    </div>
+    <!-- 中央超大數字顯示器 -->
+    <main class="flex-1 flex flex-col items-center justify-center my-4">
+        <div id="timeDisplay" class="text-8xl sm:text-9xl font-extrabold tracking-tight font-mono drop-shadow-lg transition-transform">
+            00:00
+        </div>
+    </main>
 
-    <!-- 底部設定與按鈕面板 -->
-    <div class="control-panel">
-        <div class="settings-box" id="settingsBox">
-            <div class="setting-row">
-                <span class="setting-label">準備 (Prepare)</span>
-                <div class="time-inputs">
-                    <div class="input-group"><input type="number" id="prepMin" class="setting-input" value="0" min="0" max="59"><span>分</span></div>
-                    <div class="input-group"><input type="number" id="prepSec" class="setting-input" value="10" min="0" max="59"><span>秒</span></div>
-                </div>
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">運動 (Work)</span>
-                <div class="time-inputs">
-                    <div class="input-group"><input type="number" id="workMin" class="setting-input" value="0" min="0" max="59"><span>分</span></div>
-                    <div class="input-group"><input type="number" id="workSec" class="setting-input" value="30" min="0" max="59"><span>秒</span></div>
-                </div>
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">休息 (Rest)</span>
-                <div class="time-inputs">
-                    <div class="input-group"><input type="number" id="restMin" class="setting-input" value="0" min="0" max="59"><span>分</span></div>
-                    <div class="input-group"><input type="number" id="restSec" class="setting-input" value="10" min="0" max="59"><span>秒</span></div>
-                </div>
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">循環次數 (Rounds)</span>
-                <div class="input-group" style="padding: 4px 12px;">
-                    <input type="number" id="totalRoundsInput" class="setting-input" value="3" min="1" max="99" style="width: 50px;">
-                </div>
+    <!-- 設定面板 (僅在 Idle 狀態顯示) -->
+    <section id="setupPanel" class="w-full max-w-md mx-auto bg-black/30 backdrop-blur-md rounded-3xl p-5 border border-white/10 shadow-2xl space-y-3 transition-all">
+        <!-- Prepare 設定 -->
+        <div class="flex items-center justify-between">
+            <span class="text-base font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-hourglass-start text-amber-400"></i> 準備 Prepare
+            </span>
+            <div class="flex items-center gap-3">
+                <button onclick="adjustSetting('prepare', -1)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">-</button>
+                <span id="valPrepare" class="w-12 text-center text-xl font-bold font-mono">5s</span>
+                <button onclick="adjustSetting('prepare', 1)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">+</button>
             </div>
         </div>
 
-        <div class="action-buttons">
-            <button class="btn btn-secondary" id="resetBtn" style="display: none;" onclick="resetTimer()">
-                <span class="btn-icon">🔄</span>
-            </button>
-            <button class="btn btn-main" id="mainBtn" onclick="toggleTimer()">
-                <span class="btn-icon" id="mainIcon">▶️</span>
-            </button>
+        <!-- Work 設定 -->
+        <div class="flex items-center justify-between">
+            <span class="text-base font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-fire text-red-500"></i> 運動 Work
+            </span>
+            <div class="flex items-center gap-3">
+                <button onclick="adjustSetting('work', -5)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">-</button>
+                <span id="valWork" class="w-12 text-center text-xl font-bold font-mono">20s</span>
+                <button onclick="adjustSetting('work', 5)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">+</button>
+            </div>
         </div>
-    </div>
-</div>
 
-<script>
-    const States = { IDLE: 'idle', PREPARE: 'prepare', WORK: 'work', REST: 'rest', COMPLETED: 'completed' };
-    
-    let currentState = States.IDLE;
-    let currentRound = 1;
-    let totalRounds = 3;
-    let timeRemaining = 0;
-    let timerInterval = null;
-    let isPaused = false;
-    let wakeLock = null;
+        <!-- Rest 設定 -->
+        <div class="flex items-center justify-between">
+            <span class="text-base font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-bed text-blue-400"></i> 休息 Rest
+            </span>
+            <div class="flex items-center gap-3">
+                <button onclick="adjustSetting('rest', -5)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">-</button>
+                <span id="valRest" class="w-12 text-center text-xl font-bold font-mono">10s</span>
+                <button onclick="adjustSetting('rest', 5)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">+</button>
+            </div>
+        </div>
 
-    let audioCtx = null;
-    function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
+        <!-- Rounds 設定 -->
+        <div class="flex items-center justify-between">
+            <span class="text-base font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-rotate text-emerald-400"></i> 組數 Rounds
+            </span>
+            <div class="flex items-center gap-3">
+                <button onclick="adjustSetting('rounds', -1)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">-</button>
+                <span id="valRounds" class="w-12 text-center text-xl font-bold font-mono">5</span>
+                <button onclick="adjustSetting('rounds', 1)" class="w-10 h-10 rounded-full bg-white/10 active:bg-white/30 text-xl font-bold flex items-center justify-center">+</button>
+            </div>
+        </div>
+    </section>
 
-    function playBeep(frequency = 440, duration = 0.15) {
-        try {
-            initAudio();
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = frequency;
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
-        } catch (e) {
-            console.log('Audio error:', e);
-        }
-    }
+    <!-- 底部控制按鈕區 -->
+    <footer class="w-full max-w-md mx-auto mt-6 flex items-center justify-center gap-6">
+        <!-- 重置按鈕 -->
+        <button id="btnReset" onclick="resetTimer()" class="hidden w-16 h-16 rounded-full bg-white/20 active:bg-white/40 text-white flex items-center justify-center text-2xl shadow-lg backdrop-blur-md transition-transform active:scale-95">
+            <i class="fa-solid fa-rotate-left"></i>
+        </button>
 
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
+        <!-- 主操作按鈕 (Play / Pause / Resume) -->
+        <button id="btnMain" onclick="togglePlayPause()" class="w-24 h-24 rounded-full bg-white text-gray-900 active:bg-gray-200 flex items-center justify-center text-4xl font-bold shadow-2xl transition-transform active:scale-95">
+            <i id="mainIcon" class="fa-solid fa-play ml-1"></i>
+        </button>
+    </footer>
+
+    <!-- JavaScript 邏輯處理 -->
+    <script>
+        // 1. 核心參數與狀態設定
+        const config = {
+            prepare: 5,
+            work: 20,
+            rest: 10,
+            rounds: 5
+        };
+
+        const STATES = {
+            IDLE: 'idle',
+            PREPARE: 'prepare',
+            WORK: 'work',
+            REST: 'rest',
+            FINISHED: 'finished'
+        };
+
+        let currentState = STATES.IDLE;
+        let currentRound = 1;
+        let timeRemaining = 0;
+        let timerInterval = null;
+        let isPaused = false;
+
+        // Web Audio API 提示音合成器 (不需任何外部 mp3 檔案)
+        let audioCtx = null;
+
+        function playSound(freq, duration, type = 'sine') {
             try {
-                wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err) {
-                console.log('Wake Lock error:', err);
-            }
-        }
-    }
-
-    function releaseWakeLock() {
-        if (wakeLock !== null) {
-            wakeLock.release().then(() => { wakeLock = null; });
-        }
-    }
-
-    function getTimeInSeconds(minId, secId) {
-        const m = parseInt(document.getElementById(minId).value) || 0;
-        const s = parseInt(document.getElementById(secId).value) || 0;
-        return (m * 60) + s;
-    }
-
-    function formatTimeDisplay(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        if (mins > 0) {
-            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-        }
-        return `${secs}`;
-    }
-
-    function updateUI() {
-        const body = document.body;
-        const stateTitle = document.getElementById('stateTitle');
-        const roundIndicator = document.getElementById('roundIndicator');
-        const timerText = document.getElementById('timerText');
-        const settingsBox = document.getElementById('settingsBox');
-        const resetBtn = document.getElementById('resetBtn');
-        const mainIcon = document.getElementById('mainIcon');
-
-        switch (currentState) {
-            case States.IDLE:
-                body.style.backgroundColor = 'var(--bg-idle)';
-                stateTitle.innerText = '準備就緒';
-                roundIndicator.style.display = 'none';
-                timerText.innerText = '--';
-                settingsBox.style.display = 'block';
-                resetBtn.style.display = 'none';
-                mainIcon.innerText = '▶️';
-                break;
-            case States.PREPARE:
-                body.style.backgroundColor = 'var(--bg-prepare)';
-                stateTitle.innerText = 'GET READY';
-                roundIndicator.style.display = 'block';
-                roundIndicator.innerText = `ROUND ${currentRound} / ${totalRounds}`;
-                timerText.innerText = formatTimeDisplay(timeRemaining);
-                settingsBox.style.display = 'none';
-                resetBtn.style.display = 'flex';
-                mainIcon.innerText = isPaused ? '▶️' : '⏸️';
-                break;
-            case States.WORK:
-                body.style.backgroundColor = 'var(--bg-work)';
-                stateTitle.innerText = 'WORK!';
-                roundIndicator.style.display = 'block';
-                roundIndicator.innerText = `ROUND ${currentRound} / ${totalRounds}`;
-                timerText.innerText = formatTimeDisplay(timeRemaining);
-                settingsBox.style.display = 'none';
-                resetBtn.style.display = 'flex';
-                mainIcon.innerText = isPaused ? '▶️' : '⏸️';
-                break;
-            case States.REST:
-                body.style.backgroundColor = 'var(--bg-rest)';
-                stateTitle.innerText = 'REST';
-                roundIndicator.style.display = 'block';
-                roundIndicator.innerText = `ROUND ${currentRound} / ${totalRounds}`;
-                timerText.innerText = formatTimeDisplay(timeRemaining);
-                settingsBox.style.display = 'none';
-                resetBtn.style.display = 'flex';
-                mainIcon.innerText = isPaused ? '▶️' : '⏸️';
-                break;
-            case States.COMPLETED:
-                body.style.backgroundColor = 'var(--bg-completed)';
-                stateTitle.innerText = 'FINISHED!';
-                roundIndicator.style.display = 'none';
-                timerText.innerText = '🎉';
-                settingsBox.style.display = 'none';
-                resetBtn.style.display = 'flex';
-                mainIcon.innerText = '🔄';
-                break;
-        }
-    }
-
-    function toggleTimer() {
-        if (currentState === States.IDLE) {
-            startTimer();
-        } else if (currentState === States.COMPLETED) {
-            resetTimer();
-        } else {
-            if (isPaused) {
-                resumeTimer();
-            } else {
-                pauseTimer();
-            }
-        }
-    }
-
-    function startTimer() {
-        totalRounds = parseInt(document.getElementById('totalRoundsInput').value) || 1;
-        currentRound = 1;
-        
-        const prepTime = getTimeInSeconds('prepMin', 'prepSec');
-        
-        if (prepTime > 0) {
-            currentState = States.PREPARE;
-            timeRemaining = prepTime;
-        } else {
-            currentState = States.WORK;
-            timeRemaining = getTimeInSeconds('workMin', 'workSec');
-        }
-
-        isPaused = false;
-        requestWakeLock();
-        runInterval();
-        updateUI();
-    }
-
-    function pauseTimer() {
-        clearInterval(timerInterval);
-        isPaused = true;
-        releaseWakeLock();
-        updateUI();
-    }
-
-    function resumeTimer() {
-        isPaused = false;
-        requestWakeLock();
-        runInterval();
-        updateUI();
-    }
-
-    function resetTimer() {
-        clearInterval(timerInterval);
-        currentState = States.IDLE;
-        isPaused = false;
-        releaseWakeLock();
-        updateUI();
-    }
-
-    function runInterval() {
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            if (timeRemaining > 1) {
-                timeRemaining--;
-                if (timeRemaining <= 3) {
-                    playBeep(600, 0.1);
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 }
-                updateUI();
-            } else {
-                playBeep(880, 0.3);
-                nextPhase();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.log('Audio Playback error:', e);
             }
-        }, 1000);
-    }
+        }
 
-    function nextPhase() {
-        const workTime = getTimeInSeconds('workMin', 'workSec');
-        const restTime = getTimeInSeconds('restMin', 'restSec');
+        // 防鎖屏 Wake Lock API
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock Error:', err);
+            }
+        }
 
-        if (currentState === States.PREPARE) {
-            currentState = States.WORK;
-            timeRemaining = workTime;
-        } else if (currentState === States.WORK) {
-            if (currentRound < totalRounds) {
-                currentState = States.REST;
-                timeRemaining = restTime;
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // 2. UI 畫面渲染更新
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateUI() {
+            const timeDisplay = document.getElementById('timeDisplay');
+            const statusLabel = document.getElementById('statusLabel');
+            const roundLabel = document.getElementById('roundLabel');
+            const setupPanel = document.getElementById('setupPanel');
+            const btnReset = document.getElementById('btnReset');
+            const mainIcon = document.getElementById('mainIcon');
+
+            // 背景色切換
+            document.body.className = `state-${currentState} text-white min-h-screen flex flex-col justify-between p-6 pb-12 select-none overflow-hidden`;
+
+            // 狀態與數字顯示
+            if (currentState === STATES.IDLE) {
+                statusLabel.innerText = 'TIMER PLUS';
+                roundLabel.classList.add('opacity-0');
+                timeDisplay.innerText = formatTime(config.work);
+                setupPanel.classList.remove('hidden');
+                btnReset.classList.add('hidden');
+                mainIcon.className = 'fa-solid fa-play ml-1';
             } else {
-                currentState = States.COMPLETED;
+                setupPanel.classList.add('hidden');
+                btnReset.classList.remove('hidden');
+                roundLabel.classList.remove('opacity-0');
+                roundLabel.innerText = `ROUND ${currentRound} / ${config.rounds}`;
+
+                if (currentState === STATES.PREPARE) {
+                    statusLabel.innerText = 'GET READY';
+                } else if (currentState === STATES.WORK) {
+                    statusLabel.innerText = 'WORK!';
+                } else if (currentState === STATES.REST) {
+                    statusLabel.innerText = 'REST';
+                } else if (currentState === STATES.FINISHED) {
+                    statusLabel.innerText = 'WELL DONE!';
+                    roundLabel.innerText = 'COMPLETED';
+                }
+
+                timeDisplay.innerText = formatTime(timeRemaining);
+
+                if (isPaused) {
+                    mainIcon.className = 'fa-solid fa-play ml-1';
+                } else {
+                    mainIcon.className = 'fa-solid fa-pause';
+                }
+            }
+
+            // 最後 3 秒脈動視覺提示
+            if (timeRemaining <= 3 && timeRemaining > 0 && !isPaused && currentState !== STATES.IDLE) {
+                timeDisplay.classList.add('animate-pulse-fast');
+            } else {
+                timeDisplay.classList.remove('animate-pulse-fast');
+            }
+        }
+
+        // 3. 設定參數調整
+        function adjustSetting(type, delta) {
+            if (currentState !== STATES.IDLE) return;
+            
+            if (type === 'prepare') {
+                config.prepare = Math.max(0, config.prepare + delta);
+                document.getElementById('valPrepare').innerText = `${config.prepare}s`;
+            } else if (type === 'work') {
+                config.work = Math.max(5, config.work + delta);
+                document.getElementById('valWork').innerText = `${config.work}s`;
+            } else if (type === 'rest') {
+                config.rest = Math.max(0, config.rest + delta);
+                document.getElementById('valRest').innerText = `${config.rest}s`;
+            } else if (type === 'rounds') {
+                config.rounds = Math.max(1, config.rounds + delta);
+                document.getElementById('valRounds').innerText = config.rounds;
+            }
+            updateUI();
+        }
+
+        // 4. 狀態機與倒數核心邏輯
+        function switchState(nextState) {
+            currentState = nextState;
+
+            if (currentState === STATES.PREPARE) {
+                timeRemaining = config.prepare;
+                playSound(600, 0.3);
+            } else if (currentState === STATES.WORK) {
+                timeRemaining = config.work;
+                playSound(800, 0.5);
+            } else if (currentState === STATES.REST) {
+                timeRemaining = config.rest;
+                playSound(400, 0.5);
+            } else if (currentState === STATES.FINISHED) {
+                timeRemaining = 0;
                 clearInterval(timerInterval);
+                playSound(1000, 0.8, 'square');
                 releaseWakeLock();
             }
-        } else if (currentState === States.REST) {
-            currentRound++;
-            currentState = States.WORK;
-            timeRemaining = workTime;
+
+            // 若設定 Prepare 或 Rest 時間為 0，自動進入下一階段
+            if (timeRemaining === 0 && currentState !== STATES.FINISHED) {
+                advancePhase();
+                return;
+            }
+
+            updateUI();
         }
+
+        function advancePhase() {
+            if (currentState === STATES.PREPARE) {
+                switchState(STATES.WORK);
+            } else if (currentState === STATES.WORK) {
+                if (currentRound < config.rounds) {
+                    if (config.rest > 0) {
+                        switchState(STATES.REST);
+                    } else {
+                        currentRound++;
+                        switchState(STATES.WORK);
+                    }
+                } else {
+                    switchState(STATES.FINISHED);
+                }
+            } else if (currentState === STATES.REST) {
+                currentRound++;
+                switchState(STATES.WORK);
+            }
+        }
+
+        function tick() {
+            if (isPaused) return;
+
+            if (timeRemaining > 1) {
+                timeRemaining--;
+                // 最後 3 秒播放 Short Beep 提醒
+                if (timeRemaining <= 3) {
+                    playSound(700, 0.15);
+                }
+            } else {
+                advancePhase();
+            }
+            updateUI();
+        }
+
+        // 5. 按鈕控制邏輯
+        function togglePlayPause() {
+            // 初始化聲音情境 (iOS 限制需使用者互動)
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            if (currentState === STATES.IDLE || currentState === STATES.FINISHED) {
+                currentRound = 1;
+                isPaused = false;
+                requestWakeLock();
+                
+                if (config.prepare > 0) {
+                    switchState(STATES.PREPARE);
+                } else {
+                    switchState(STATES.WORK);
+                }
+
+                clearInterval(timerInterval);
+                timerInterval = setInterval(tick, 1000);
+            } else {
+                // 暫停 / 繼續 切換
+                isPaused = !isPaused;
+                if (isPaused) {
+                    releaseWakeLock();
+                } else {
+                    requestWakeLock();
+                }
+            }
+            updateUI();
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            currentState = STATES.IDLE;
+            currentRound = 1;
+            isPaused = false;
+            timeRemaining = 0;
+            releaseWakeLock();
+            updateUI();
+        }
+
+        // 初始化頁面
         updateUI();
-    }
-</script>
+    </script>
 </body>
 </html>
